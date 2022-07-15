@@ -15,9 +15,12 @@ if __name__ == '__main__':
     ast.show()
 
     # z3 example
-    a = z3.Int('a')
-    b = z3.Int('b')
+    a = z3.BitVec('a', 32)
+    b = z3.BitVec('b', 32)
     s = z3.Solver()
-    s.add(z3.And(a <= b, a >= b, a >= 10))
-    if s.check() == z3.sat:
+    s.add(z3.And(a <= b, a >= b, a + 1 >= 10))
+    result = s.check()
+    if result == z3.sat:
         print(s.model())
+    else:
+        print(result)
