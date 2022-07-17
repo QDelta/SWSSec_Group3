@@ -1,3 +1,9 @@
+import pycparser.c_ast as csyn
+from asthelper import *
+
+# integer type: ('int', bitwidth)
+# pointer type: ('ptr', bitwidth of element)
+
 class SymBinaryExpr:
     def __init__(self, op, left, right):
         self.op = op
@@ -15,15 +21,12 @@ class SymPtr:
     def __init__(self, base):
         self.base = base
         self.offset = 0
-        # e.g. SymPtr(index of ExecContext.allocated_arrays, 1)
+        # SymPtr(index of ExecContext.allocated_arrays, element offset)
 
 class SymFunCall:
     def __init__(self, func, args):
         self.func = func
         self.args = args
-
-# integer type: ('int', bitwidth)
-# pointer type: ('ptr', bitwidth of element)
 
 # constraints are represented by 3-tuple (op, symexpr, symexpr)
 #   like ('>=', SymBinExpr('+', 'm', 1), 'n')
