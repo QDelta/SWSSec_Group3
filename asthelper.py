@@ -1,26 +1,26 @@
 import pycparser.c_ast as csyn
 
-# integer type: ('int', bitwidth)
-# pointer type: ('ptr', bitwidth of element)
+# integer type: ('int', bytewidth)
+# pointer type: ('ptr', bytewidth of element)
 
-def bitwidth_of(c_type):
+def bytewidth_of(c_type):
     if isinstance(c_type, csyn.IdentifierType):
         if c_type.names == ['int']:
-            return 32
+            return 4
         elif c_type.names == ['char']:
-            return 8
+            return 1
 
     raise Exception("unknown type ", c_type)
 
 def decl_to_type(decl):
     if isinstance(decl, csyn.TypeDecl):
-        return ('int', bitwidth_of(decl.type))
+        return ('int', bytewidth_of(decl.type))
     elif isinstance(decl, csyn.PtrDecl):
         ty_kind, width = decl_to_type(decl.type)
         if ty_kind == 'int':
             return ('ptr', width)
         else: # ty_kind == 'ptr'
-            return ('ptr', 64)
+            return ('ptr', 8)
 
     raise Exception("unknown decl ", decl)
 
