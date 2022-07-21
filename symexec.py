@@ -1,43 +1,23 @@
+from collections import namedtuple
 import pycparser.c_ast as csyn
 from asthelper import *
+import z3
 
-# integer type: ('int', bitwidth)
-# pointer type: ('ptr', bitwidth of element)
+# integer type: ('int', bytewidth)
+# pointer type: ('ptr', bytewidth of element)
 
-class SymBinaryExpr:
-    def __init__(self, op, left, right):
-        self.op = op
-        self.left = left
-        self.right = right
-        # e.g. SymBinExpr('+', 'a', 1)
+# values
+IntVal = namedtuple('IntVal', ['val'])
+PtrVal = namedtuple('PtrVal', ['low', 'high'])
 
-class SymUnaryExpr:
-    def __init__(self, op, e):
-        self.op = op
-        self.expr = e
-        # e.g. SymUnaryExpr('-', 'a')
-
-class SymPtr:
-    def __init__(self, base):
-        self.base = base
-        self.offset = 0
-        # SymPtr(index of ExecContext.allocated_arrays, element offset)
-
-class SymFunCall:
-    def __init__(self, func, args):
-        self.func = func
-        self.args = args
-
-# constraints are represented by 3-tuple (op, symexpr, symexpr)
-#   like ('>=', SymBinExpr('+', 'm', 1), 'n')
+# use z3 corresponding components for other definitions
+# like ite -> z3.If
 
 class ExecContext:
     def __init__(self):
-        self.progvar_binds = dict()
-        self.path_conditions = []
-        self.allocated_arrays = []
+        self.environment = dict()
+        self.path_condition = True
         self.progvar_types = dict()
-        self.symvar_types = dict()
         self.name_gen = NameGenerator() # generating names of symvars
 
     # merge context of two branches
