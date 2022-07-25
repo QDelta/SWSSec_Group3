@@ -1,46 +1,17 @@
 import pycparser.c_ast as csyn
 
-
-# integer   type: ('int', bitwidth)
-# character type: ('char', bitwidth)
-# pointer   type: ('ptr', bitwidth of element)
-
-# Expired.
-def bytewidth_of(c_type):
-    if isinstance(c_type, csyn.IdentifierType):
-        if c_type.names == ['int']:
-            return 4 * 8
-        elif c_type.names == ['char']:
-            return 1 * 8
-
-    raise Exception("unknown type ", c_type)
-
-
-# When decl is csyn.TypeDecl, judge its type.
-def judge_indentifier(c_type: csyn.TypeDecl) -> (str, int):
-    if isinstance(c_type, csyn.IdentifierType):
-        if c_type.names == ['int']:
-            return 'int', 4 * 8
-        elif c_type.names == ['char']:
-            return 'char', 1 * 8
-
-    raise Exception("Unknown type ", c_type)
-
+# int   : 'int'
+# int * : 'intptr'
 
 def decl_to_type(decl):
     if isinstance(decl, csyn.TypeDecl):
-        return judge_indentifier(decl.type)
+        return 'int'
     elif isinstance(decl, csyn.PtrDecl):
-        ty_kind, width = decl_to_type(decl.type)
-        if ty_kind == 'int' or ty_kind == 'char':
-            return 'ptr', width
-        else:  # ty_kind == 'ptr'.
-            return 'ptr', 8 * 8
+        return 'ptr'
 
     raise Exception("unknown decl ", decl)
 
-
-# ParamList -> (name, (type, bitwidth)) list
+# ParamList -> (name, type) list
 def extract_params(c_params: csyn.ParamList) -> list:
     c_params = c_params.params
     params = []
@@ -48,9 +19,8 @@ def extract_params(c_params: csyn.ParamList) -> list:
         params.append((decl.name, decl_to_type(decl.type)))
     return params
 
-
 # FuncDef -> params (name, type, bitwidth) list, assume (expr) list, body (stmt)
-def split_fundef(fundef: csyn.FuncDef) -> (list, list, csyn.Compound):
+def split_fundef(fundef: csyn.FuncDef):
     c_params: csyn.ParamList = fundef.decl.type.args
     params = extract_params(c_params)
 
