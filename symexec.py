@@ -26,6 +26,10 @@ def toint(v):
     else:
         return v
 
+class SymExecError(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+
 # * values * #
 IntVal = namedtuple('IntVal', ['val'])
 IntPtrVal = namedtuple('IntPtrVal', ['low', 'high'])
@@ -62,7 +66,7 @@ class ExecContext:
             if cond.op == '!':
                 return z3.Not(self.__parse_condition(cond.expr))
             else:
-                raise Exception(f"Unsupported unary operator in condition: {cond.op}")
+                raise SymExecError(f"Unsupported unary operator in condition: {cond.op}")
         if isinstance(cond, csyn.BinaryOp):
             if cond.op in ['>', '>=', '<', '<=', '==', '!=']:
                 lval = self.eval(cond.left, in_assume=in_assume)
@@ -82,7 +86,7 @@ class ExecContext:
                     else: # cond.op == '!='
                         return lval != rval
                 else:
-                    raise Exception('Integer comparsion operator applied to non-integers')
+                    raise SymExecError('Integer comparsion operator applied to non-integers')
             elif cond.op in ['&&', '||']:
                 lcond = self.__parse_condition(cond.left)
                 rcond = self.__parse_condition(cond.right)
@@ -91,9 +95,9 @@ class ExecContext:
                 else: # cond.op == '||'
                     return z3.Or(lcond, rcond)
             else:
-                raise Exception(f"Unsupported binary operator in condition: {cond.op}")
+                raise SymExecError(f"Unsupported binary operator in condition: {cond.op}")
         else:
-            raise Exception(f"Unsupported condition: {cond}")
+            raise SymExecError(f"Unsupported condition: {cond}")
 
     # evaluation: returns either IntVal or PtrVal
     def eval(self, expr: csyn.Node, in_assume=False):
@@ -105,12 +109,12 @@ class ExecContext:
                 else:
                     return IntVal(z3.BitVecVal(expr.value, 32))
             else:
-                raise Exception(f"Unsupported constant type: {expr.type}")
+                raise SymExecError(f"Unsupported constant type: {expr.type}")
 
         # Evaluate name
         elif isinstance(expr, csyn.ID):
             if expr.name not in self.env:
-                raise Exception(f"Undeclared variable: {expr.name}")
+                raise SymExecError(f"Undeclared variable: {expr.name}")
 
             return self.env[expr.name]
 
@@ -123,9 +127,9 @@ class ExecContext:
                 if isinstance(val, IntVal):
                     return IntVal(-val.val)
                 else:
-                    raise Exception(f"Can not apply '-' to {expr}")
+                    raise SymExecError(f"Can not apply '-' to {expr}")
             else:
-                raise Exception(f"Unsupported unary operator {expr.op}")
+                raise SymExecError(f"Unsupported unary operator {expr.op}")
 
         # Evaluate binary operation:
         elif isinstance(expr, csyn.BinaryOp):
@@ -143,7 +147,7 @@ class ExecContext:
                     return IntPtrVal(right.low - toint(left.val),
                                      right.high - toint(left.val))
                 else:
-                    raise Exception(f"Can not apply '{op}' to integer and pointer")
+                    raise SymExecError(f"Can not apply '{op}' to integer and pointer")
             elif isinstance(left, IntPtrVal) and isinstance(right, IntVal):
                 if expr.op == '+':
                     return IntPtrVal(left.low - toint(right.val),
@@ -152,7 +156,7 @@ class ExecContext:
                     return IntPtrVal(left.low + toint(right.val),
                                      left.high + toint(right.val))
                 else:
-                    raise Exception(f"Can not apply '{op}' to integer and pointer")
+                    raise SymExecError(f"Can not apply '{op}' to integer and pointer")
 
         # Evaluate memory allocation:
         elif isinstance(expr, csyn.FuncCall):
@@ -162,29 +166,29 @@ class ExecContext:
                 fname = func.name
                 if in_assume:
                     if fname != 'capacity':
-                        raise Exception(f"Unsupported function {fname} in assumption")
+                        raise SymExecError(f"Unsupported function {fname} in assumption")
                     if len(args) != 1:
-                        raise Exception(f"'capacity' expects 1 argument, given {len(args)}")
+                        raise SymExecError(f"'capacity' expects 1 argument, given {len(args)}")
                     ptr = self.eval(args[0])
                     if isinstance(ptr, IntPtrVal):
                         return IntVal(ptr.high)
                     else:
-                        raise Exception(f"'capacity' expects pointer, given {args[0]}")
+                        raise SymExecError(f"'capacity' expects pointer, given {args[0]}")
                 else:
                     if fname != 'alloc':
-                        raise Exception(f"Unsupported function {fname} in assumption")
+                        raise SymExecError(f"Unsupported function {fname} in assumption")
                     if len(args) != 1:
-                        raise Exception(f"'malloc' expects 1 argument, given {len(args)}")
+                        raise SymExecError(f"'malloc' expects 1 argument, given {len(args)}")
                     cap = self.eval(args[0])
                     if isinstance(cap, IntVal):
                         return IntPtrVal(0, toint(cap.val))
                     else:
-                        raise Exception(f"'alloc' expects integer, given {args[0]}")
+                        raise SymExecError(f"'alloc' expects integer, given {args[0]}")
             else:
-                raise Exception(f"Unsupported non-identifier function call: {func}")
+                raise SymExecError(f"Unsupported non-identifier function call: {func}")
 
         else:
-            raise Exception(f"Unsupported expr: {expr}")
+            raise SymExecError(f"Unsupported expr: {expr}")
 
     @staticmethod
     def eval_int_binop(op: str, left, right):
@@ -224,10 +228,10 @@ class ExecContext:
             if isinstance(stmt.lvalue, csyn.ID):
                 vname = stmt.lvalue.name
                 if stmt.lvalue.name not in self.env:
-                    raise Exception(f"Undeclared identifier {vname}")
+                    raise SymExecError(f"Undeclared identifier {vname}")
                 self.env[vname] = self.eval(stmt.rvalue)
             else:
-                raise Exception(f"Unsupported left-side of assignment: {stmt.lvalue}")
+                raise SymExecError(f"Unsupported left-side of assignment: {stmt.lvalue}")
             
             return []
 
@@ -244,8 +248,8 @@ class ExecContext:
                             return [(z3.And(self.path_cond, z3.Or(ptr.low > toint(idx.val), toint(idx.val) >= ptr.high)), arg.coord.line)]
 
                         else:
-                            raise Exception("Array subscript expect pointer[integer]")
-            raise Exception(f"Unsupported statement: {stmt}")
+                            raise SymExecError("Array subscript expect pointer[integer]")
+            raise SymExecError(f"Unsupported statement: {stmt}")
 
         # Exec sequence stmt:
         elif isinstance(stmt, csyn.Compound):
@@ -272,11 +276,11 @@ class ExecContext:
 
             return ce_list
         else:
-            raise Exception(f"Unsupported statement: {stmt}")
+            raise SymExecError(f"Unsupported statement: {stmt}")
 
     def __decl_int(self, var_name, init=None):
         if var_name in self.env:
-            raise Exception(f"Duplicate declaration of {var_name}")
+            raise SymExecError(f"Duplicate declaration of {var_name}")
 
         if init:
             self.env[var_name] = init
@@ -287,7 +291,7 @@ class ExecContext:
 
     def __decl_intptr(self, var_name, init=None):
         if var_name in self.env:
-            raise Exception(f"Duplicate declaration of {var_name}")
+            raise SymExecError(f"Duplicate declaration of {var_name}")
         
         if init:
             self.env[var_name] = init
@@ -308,5 +312,5 @@ class ExecContext:
                     new_env[x] = IntPtrVal(z3.If(a, v1.low, v2.low),
                                            z3.If(a, v1.high, v2.high))
                 else:
-                    raise Exception(f"{x} is assigned to different types of value in two branches")
+                    raise SymExecError(f"{x} is assigned to different types of value in two branches")
         return new_env
