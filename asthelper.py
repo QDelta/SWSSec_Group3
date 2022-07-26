@@ -1,18 +1,18 @@
-import pycparser.c_ast as csyn
+from pycparser import c_ast
 
 # int   : 'int'
 # int * : 'intptr'
 
 def decl_to_type(decl):
-    if isinstance(decl, csyn.TypeDecl):
+    if isinstance(decl, c_ast.TypeDecl):
         return 'int'
-    elif isinstance(decl, csyn.PtrDecl):
+    elif isinstance(decl, c_ast.PtrDecl):
         return 'ptr'
 
     raise Exception("unknown decl ", decl)
 
 # ParamList -> (name, type) list
-def extract_params(c_params: csyn.ParamList) -> list:
+def extract_params(c_params: c_ast.ParamList) -> list:
     c_params = c_params.params
     params = []
     for decl in c_params:
@@ -20,17 +20,17 @@ def extract_params(c_params: csyn.ParamList) -> list:
     return params
 
 # FuncDef -> params (name, type, bitwidth) list, assume (expr) list, body (stmt)
-def split_fundef(fundef: csyn.FuncDef):
-    c_params: csyn.ParamList = fundef.decl.type.args
+def split_fundef(fundef: c_ast.FuncDef):
+    c_params: c_ast.ParamList = fundef.decl.type.args
     params = extract_params(c_params)
 
-    body: csyn.Compound = fundef.body
+    body: c_ast.Compound = fundef.body
 
     assumes = []
     if len(body.block_items) > 0:
         maybe_assume = body.block_items[0]
-        if isinstance(maybe_assume, csyn.FuncCall):
-            if isinstance(maybe_assume.name, csyn.ID):
+        if isinstance(maybe_assume, c_ast.FuncCall):
+            if isinstance(maybe_assume.name, c_ast.ID):
                 if maybe_assume.name.name == 'ASSUME':
                     assumes = maybe_assume.args.exprs
                     body.block_items = body.block_items[1:]

@@ -1,6 +1,6 @@
 from copy import deepcopy
 from collections import namedtuple
-import pycparser.c_ast as csyn
+from pycparser import c_ast
 from asthelper import *
 import z3
 
@@ -18,7 +18,19 @@ class NameGenerator:
             self.mem[base] = 0
             return base
 
-NAME_GEN = NameGenerator()
+    @staticmethod
+    def merge(gen1, gen2):
+        new_mem = dict()
+        for x in gen1.mem:
+            if x in gen2.mem:
+                new_mem[x] = max(gen1.mem[x], gen2.mem[x])
+            else:
+                new_mem[x] = gen1.mem[x]
+        for x in gen2.mem:
+            if x not in gen1.mem:
+                new_mem[x] = gen2.mem[x]
+        new_gen = NameGenerator()
+        new_gen.mem = new_mem
 
 def toint(v):
     if z3.is_bv(v):
@@ -38,6 +50,7 @@ class ExecContext:
     def __init__(self, params, assumes):
         self.env = dict()
         self.path_cond = True
+        self.name_gen = NameGenerator()
         self.__init_env(params)
         self.__init_path_cond(assumes)
 
@@ -47,7 +60,7 @@ class ExecContext:
             if typ == 'int':
                 self.__decl_int(pname)
             elif typ == 'ptr':
-                high_name = NAME_GEN.new_name(f'{pname}_capacity')
+                high_name = self.name_gen.new_name(f'{pname}_capacity')
                 high = z3.Int(high_name)
                 self.__decl_intptr(pname, init=IntPtrVal(0, high))
                 self.__add_assume(high >= 0)
@@ -61,13 +74,13 @@ class ExecContext:
         self.path_cond = z3.And(self.path_cond, a)
 
     # Parse condition into z3 Bool.
-    def __parse_condition(self, cond: csyn.Node, in_assume=False):
-        if isinstance(cond, csyn.UnaryOp):
+    def __parse_condition(self, cond: c_ast.Node, in_assume=False):
+        if isinstance(cond, c_ast.UnaryOp):
             if cond.op == '!':
                 return z3.Not(self.__parse_condition(cond.expr))
             else:
                 raise SymExecError(f"Unsupported unary operator in condition: {cond.op}")
-        if isinstance(cond, csyn.BinaryOp):
+        if isinstance(cond, c_ast.BinaryOp):
             if cond.op in ['>', '>=', '<', '<=', '==', '!=']:
                 lval = self.eval(cond.left, in_assume=in_assume)
                 rval = self.eval(cond.right, in_assume=in_assume)
@@ -100,9 +113,9 @@ class ExecContext:
             raise SymExecError(f"Unsupported condition: {cond}")
 
     # evaluation: returns either IntVal or PtrVal
-    def eval(self, expr: csyn.Node, in_assume=False):
+    def eval(self, expr: c_ast.Node, in_assume=False):
         # Evaluate integer literal
-        if isinstance(expr, csyn.Constant):
+        if isinstance(expr, c_ast.Constant):
             if expr.type == 'int':
                 if in_assume:
                     return IntVal(z3.IntVal(expr.value))
@@ -112,14 +125,14 @@ class ExecContext:
                 raise SymExecError(f"Unsupported constant type: {expr.type}")
 
         # Evaluate name
-        elif isinstance(expr, csyn.ID):
+        elif isinstance(expr, c_ast.ID):
             if expr.name not in self.env:
                 raise SymExecError(f"Undeclared variable: {expr.name}")
 
             return self.env[expr.name]
 
         # Evaluate unary operation:
-        elif isinstance(expr, csyn.UnaryOp):
+        elif isinstance(expr, c_ast.UnaryOp):
             if expr.op == '+':
                 return self.eval(expr.expr)
             elif expr.op == '-':
@@ -132,7 +145,7 @@ class ExecContext:
                 raise SymExecError(f"Unsupported unary operator {expr.op}")
 
         # Evaluate binary operation:
-        elif isinstance(expr, csyn.BinaryOp):
+        elif isinstance(expr, c_ast.BinaryOp):
             left = self.eval(expr.left)
             right = self.eval(expr.right)
             if isinstance(left, IntVal) and isinstance(right, IntVal):
@@ -159,10 +172,10 @@ class ExecContext:
                     raise SymExecError(f"Can not apply '{op}' to integer and pointer")
 
         # Evaluate memory allocation:
-        elif isinstance(expr, csyn.FuncCall):
+        elif isinstance(expr, c_ast.FuncCall):
             func = expr.name
             args = expr.args.exprs
-            if isinstance(func, csyn.ID):
+            if isinstance(func, c_ast.ID):
                 fname = func.name
                 if in_assume:
                     if fname != 'capacity':
@@ -207,9 +220,12 @@ class ExecContext:
                 return IntVal(left / right)
 
     # execution: returns list of counter examples
-    def exec(self, stmt: csyn.Node) -> list:
+    def exec(self, stmt: c_ast.Node) -> list:
+        # Exec skip stmt:
+        if not stmt:
+            return []
         # Exec decl stmt:
-        if isinstance(stmt, csyn.Decl):
+        elif isinstance(stmt, c_ast.Decl):
             if stmt.init:
                 init_val = self.eval(stmt.init)
             else:
@@ -224,8 +240,8 @@ class ExecContext:
             return []
 
         # Exec assign stmt:
-        elif isinstance(stmt, csyn.Assignment):
-            if isinstance(stmt.lvalue, csyn.ID):
+        elif isinstance(stmt, c_ast.Assignment):
+            if isinstance(stmt.lvalue, c_ast.ID):
                 vname = stmt.lvalue.name
                 if stmt.lvalue.name not in self.env:
                     raise SymExecError(f"Undeclared identifier {vname}")
@@ -236,11 +252,11 @@ class ExecContext:
             return []
 
         # Exec access stmt:
-        elif isinstance(stmt, csyn.FuncCall):
-            if isinstance(stmt.name, csyn.ID):
+        elif isinstance(stmt, c_ast.FuncCall):
+            if isinstance(stmt.name, c_ast.ID):
                 if stmt.name.name == 'print':
                     arg = stmt.args.exprs[0]
-                    if isinstance(arg, csyn.ArrayRef):
+                    if isinstance(arg, c_ast.ArrayRef):
                         ptr = self.eval(arg.name)
                         idx = self.eval(arg.subscript)
 
@@ -252,14 +268,15 @@ class ExecContext:
             raise SymExecError(f"Unsupported statement: {stmt}")
 
         # Exec sequence stmt:
-        elif isinstance(stmt, csyn.Compound):
+        elif isinstance(stmt, c_ast.Compound):
             ce_list = []
-            for s in stmt.block_items:
-                ce_list += self.exec(s)
+            if stmt.block_items:
+                for s in stmt.block_items:
+                    ce_list += self.exec(s)
             return ce_list
 
         # Exec if-then stmt:
-        elif isinstance(stmt, csyn.If):
+        elif isinstance(stmt, c_ast.If):
             cond = self.__parse_condition(stmt.cond)
             ce_list = []
 
@@ -272,7 +289,10 @@ class ExecContext:
             ce_list += false_ctx.exec(stmt.iffalse)
 
             new_env = self.__merge_env(cond, true_ctx.env, false_ctx.env)
+            new_name_gen = NameGenerator.merge(true_ctx.name_gen, false_ctx.name_gen)
+
             self.env = new_env
+            self.name_gen = new_name_gen
 
             return ce_list
         else:
@@ -285,7 +305,7 @@ class ExecContext:
         if init:
             self.env[var_name] = init
         else:
-            logical_name = NAME_GEN.new_name(var_name)
+            logical_name = self.name_gen.new_name(var_name)
             sym_val = z3.BitVec(logical_name, 32)
             self.env[var_name] = IntVal(sym_val)
 
