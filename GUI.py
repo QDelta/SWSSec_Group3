@@ -1,3 +1,4 @@
+from email.errors import CloseBoundaryNotFoundDefect
 from fileinput import filename
 import idlelib.colorizer as idc
 import idlelib.percolator as idp
@@ -7,10 +8,11 @@ import tkinter.messagebox as tm
 import subprocess as subp
 import re
 from driver import analyze
-# from PIL import Image, ImageTk
+from PIL import Image, ImageTk
 
 error_info = []
 error_col = []
+welcome_page=0
 
 
 def get_content():  # 更新右侧display文本框的内容
@@ -121,35 +123,65 @@ def func_quit():  # 下方quit_bar
 
 
 def welcome():
+    global welcome_page
     welcome_page=tk.Tk()
-    welcome_page.title('hello')
+    welcome_page.title('Welcome')
     welcome_page.geometry('1000x800')
     welcome_page.state('zoomed')
-    poster = tk.PhotoImage(file="/img/poster.gif")
-    imgLabel = tk.Label(welcome_page,image=poster)
-    imgLabel.pack(side=tk.TOP)
-    # load=Image.open("/img/poster.png")
-    # poster=ImageTk.PhotoImage(load)
-    # imgLabel=tk.Label(welcome_page,image=poster)
-    # imgLabel.image=poster
+    # poster = tk.PhotoImage(file="/img/poster.gif")
+    # imgLabel = tk.Label(welcome_page,image=poster)
     # imgLabel.pack(side=tk.TOP)
-    # botm = tk.Button(
-    #             text='Let\'s GO!',      # 显示在按钮上的文字
-    #             width=15, height=1,
-    #             command=welcome_page.destroy(),
-    #             fg='red')     # 点击按钮式执行的命令
+
+
+    load=Image.open("./poster.png")
+    poster=ImageTk.PhotoImage(load)
+    imgLabel=tk.Label(welcome_page,image=poster)
+    imgLabel.image=poster
+    imgLabel.pack(side=tk.TOP)
+    l = tk.Label(welcome_page, 
+    text='Welcome!\n\n',   
+    # bg='green', 
+    font=('Arial', 20),     # 字体和字体大小
+    width=15, height=3  # 标签长宽
+    )
+    l.pack()    # 固定窗口位置
+    l2 = tk.Label(welcome_page, 
+    text='This is a system that could capture all overflows of the C source code which couldn\'t be pointed by the compiler.\n We use symbolic execution techniques and some tool kits such as pycparser and z3(SMT Solver) to construct this system.\n\nAll you need is enter the syntactically correct code in the left text box, then click Process. \nWe will check if there are any vulnerabilities in your code and show them in the right text box.\n Enjoy it :)',   
+    # bg='green', 
+    font=('Arial', 12),     # 字体和字体大小
+    )
+    l2.pack()    # 固定窗口位置
+
+    botm = tk.Button(
+                welcome_page,
+                text='Let\'s GO!',      # 显示在按钮上的文字
+                width=15, height=1,
+                command=welquit,
+                )     # 点击按钮式执行的命令
     # # b.grid(row=55,column=55)
-    # botm.pack(side=tk.BOTTOM)
-    # welcome_page.mainloop()
+    botm.pack(side=tk.BOTTOM)
+
+    l3 = tk.Label(welcome_page, 
+    text='System made by NUS_SWS_DOTA_Group3\n      Hong Yun\n      Qin Jianxing\n      Qu Shaobo\n      Zhang Shuhao',   
+    # bg='green', 
+    font=('Arial', 8),
+    fg='blue'     # 字体和字体大小
+    )
+    l3.pack(side=tk.RIGHT)    # 固定窗口位置
 
 
+    welcome_page.mainloop()
+
+def welquit():  
+    global welcome_page
+    welcome_page.destroy()
 
 if __name__ == '__main__':
 
     # this will cause segfault!
     # welcome_page=tk.Tk()
     # welcome_page.destroy()
-    # welcome()
+    welcome()
 
 
     root = tk.Tk()
@@ -157,7 +189,7 @@ if __name__ == '__main__':
     root.geometry('500x800')
     root.state('zoomed')
 
-    ft = tf.Font(family='Fixedsys', size=14)
+    ft = tf.Font(family='Fixedsys', size=10)
 
     bt_frm = tk.Frame(root)
     bt_frm.pack(side=tk.BOTTOM)
