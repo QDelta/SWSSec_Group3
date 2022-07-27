@@ -144,20 +144,20 @@ def welcome():
     font=('Arial', 20),     # 字体和字体大小
     width=15, height=3  # 标签长宽
     )
-    l.pack()    # 固定窗口位置
+    l.pack()   
     l2 = tk.Label(welcome_page, 
-    text='This is a system that could capture all overflows of the C source code which couldn\'t be pointed by the compiler.\n We use symbolic execution techniques and some tool kits such as pycparser and z3(SMT Solver) to construct this system.\n\nAll you need is enter the syntactically correct code in the left text box, then click Process. \nWe will check if there are any vulnerabilities in your code and show them in the right text box.\n Enjoy it :)',   
+    text='This is a system that could capture all overflows of the C source code which couldn\'t be pointed by the compiler.\n We use symbolic execution techniques and some tool kits such as pycparser and z3(SMT Solver) to construct this system.\n\nAll you need is entering the syntactically correct code in the left text box, then click Process. \nWe will check if there are any vulnerabilities in your code and show them in the right text box.\n Enjoy it :)',   
     # bg='green', 
-    font=('Arial', 12),     # 字体和字体大小
+    font=('Arial', 12),    
     )
-    l2.pack()    # 固定窗口位置
+    l2.pack()  
 
     botm = tk.Button(
                 welcome_page,
-                text='Let\'s GO!',      # 显示在按钮上的文字
+                text='Let\'s GO!',     
                 width=15, height=1,
                 command=welquit,
-                )     # 点击按钮式执行的命令
+                )   
     # # b.grid(row=55,column=55)
     botm.pack(side=tk.BOTTOM)
 
@@ -198,14 +198,14 @@ if __name__ == '__main__':
     bt_frm['background'] = 'yellow'
 
     b = tk.Button(bt_frm,
-                  text='Process',      # 显示在按钮上的文字
+                  text='Process',      
                   width=15, height=1,
-                  command=content_update)     # 点击按钮式执行的命令
+                  command=content_update)    
     # b.grid(row=55,column=55)
     b.pack(side=tk.LEFT)
 
     c = tk.Button(bt_frm,
-                  text='About',      # 显示在按钮上的文字
+                  text='About',     
                   width=15, height=1,
                   command=func_about,
                   fg='blue')     # 点击按钮式执行的命令
