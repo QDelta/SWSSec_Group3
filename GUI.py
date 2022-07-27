@@ -1,5 +1,3 @@
-from email.errors import CloseBoundaryNotFoundDefect
-from fileinput import filename
 import idlelib.colorizer as idc
 import idlelib.percolator as idp
 import tkinter as tk
